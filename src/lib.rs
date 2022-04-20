@@ -67,7 +67,7 @@
 extern crate smallvec;
 
 use std::borrow::Borrow;
-use std::collections::hash_map::{IntoIter, Keys, RandomState};
+use std::collections::hash_map::RandomState;
 use std::collections::HashMap;
 use std::fmt::{self, Debug};
 use std::hash::{BuildHasher, Hash};
@@ -76,7 +76,7 @@ use std::ops::Index;
 
 pub use std::collections::hash_map::Iter as IterAll;
 pub use std::collections::hash_map::IterMut as IterAllMut;
-use smallvec::{smallvec, SmallVec};
+use smallvec::SmallVec;
 
 pub use entry::{Entry, OccupiedEntry, VacantEntry};
 
@@ -87,9 +87,18 @@ mod entry;
 pub mod serde;
  */
 
+/// The internal vector type for each item.
+///
+/// This can be any type that resembles a standard Vec.
+pub type MapVec<V> = SmallVec<[V; 1]>;
+
+/// A macro that can create and populate a new MapVec collection.
+/// It works like the vec![] macro.
+pub use smallvec::smallvec as mapvec;
+
 #[derive(Clone)]
 pub struct MultiMap<K, V, S = RandomState> {
-    inner: HashMap<K, smallvec::SmallVec<[V; 8]>, S>,
+    inner: HashMap<K, MapVec<V>, S>,
 }
 
 impl<K, V> MultiMap<K, V>
@@ -184,7 +193,7 @@ where
                 entry.get_mut().push(v);
             }
             std::collections::hash_map::Entry::Vacant(entry) => {
-                entry.insert(smallvec![v]);
+                entry.insert(mapvec![v]);
             }
         }
     }
@@ -239,7 +248,7 @@ where
                 entry.get_mut().extend_from_slice(v);
             }
             std::collections::hash_map::Entry::Vacant(entry) => {
-                entry.insert(SmallVec::from_slice(v));
+                entry.insert(MapVec::from_slice(v));
             }
         }
     }
@@ -374,12 +383,12 @@ where
     /// map.insert(1, 1337);
     /// assert_eq!(map.get_vec(&1), Some(&vec![42, 1337]));
     /// ```
-    pub fn get_vec<Q: ?Sized>(&self, k: &Q) -> Option<&[V]>
+    pub fn get_vec<Q: ?Sized>(&self, k: &Q) -> Option<&MapVec<V>>
     where
         K: Borrow<Q>,
         Q: Eq + Hash,
     {
-        self.inner.get(k).map(|i| i.as_slice())
+        self.inner.get(k)
     }
 
     /// Returns a mutable reference to the vector corresponding to the key.
@@ -401,12 +410,12 @@ where
     /// }
     /// assert_eq!(map.get_vec(&1), Some(&vec![1991, 2332]));
     /// ```
-    pub fn get_vec_mut<Q: ?Sized>(&mut self, k: &Q) -> Option<&mut [V]>
+    pub fn get_vec_mut<Q: ?Sized>(&mut self, k: &Q) -> Option<&mut MapVec<V>>
     where
         K: Borrow<Q>,
         Q: Eq + Hash,
     {
-        self.inner.get_mut(k).map(|i| i.as_mut_slice())
+        self.inner.get_mut(k)
     }
 
     /// Returns true if the key is multi-valued.
@@ -576,8 +585,8 @@ where
     ///     println!("key: {:?}, values: {:?}", key, values);
     /// }
     /// ```
-    pub fn iter_all(&self) -> impl Iterator<Item = (&K, &[V])> {
-        self.inner.iter().map(|(k, v)| (k, v.as_slice()))
+    pub fn iter_all(&self) -> impl Iterator<Item = (&K, &MapVec<V>)> {
+        self.inner.iter()
     }
 
     /// An iterator visiting all key-value pairs in arbitrary order. The iterator returns
@@ -605,8 +614,8 @@ where
     ///     println!("key: {:?}, values: {:?}", key, values);
     /// }
     /// ```
-    pub fn iter_all_mut(&mut self) -> impl Iterator<Item = (&K, &mut [V])> {
-        self.inner.iter_mut().map(|(k, v)| (k, v.as_mut_slice()))
+    pub fn iter_all_mut(&mut self) -> impl Iterator<Item = (&K, &mut MapVec<V>)> {
+        self.inner.iter_mut()
     }
 
     /*
@@ -835,7 +844,7 @@ where
                     entry.get_mut().extend(values);
                 }
                 std::collections::hash_map::Entry::Vacant(entry) => {
-                    entry.insert(SmallVec::from(values));
+                    entry.insert(MapVec::from(values));
                 }
             }
         }
